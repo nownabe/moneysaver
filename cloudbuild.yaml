@@ -3,8 +3,10 @@ steps:
     name: 'docker:19'
     args:
       - build
-      - --tag ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:$COMMIT_SHA
-      - --tag ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:latest
+      - --tag
+      - ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:$COMMIT_SHA
+      - --tag
+      - ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:latest
       - .
   - id: push
     name: 'docker:19'
