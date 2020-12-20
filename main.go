@@ -68,7 +68,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := reply(ctx, 12345); err != nil {
+	if err := reply(ctx, msg.Event.Channel, 12345); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

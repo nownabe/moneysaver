@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	token   string = os.Getenv("SLACK_BOT_TOKEN")
-	channel string = os.Getenv("SLACK_CHANNEL")
+	token string = os.Getenv("SLACK_BOT_TOKEN")
+	// channel string = os.Getenv("SLACK_CHANNEL")
 )
 
 type slackChatPostMessage struct {
@@ -41,8 +41,8 @@ type slackResponse struct {
 	Error string `json:"error"`
 }
 
-func reply(ctx context.Context, amount int) error {
-	m := buildSlackChatPostMessage(amount)
+func reply(ctx context.Context, ch string, amount int) error {
+	m := buildSlackChatPostMessage(ch, amount)
 
 	reqBody, err := json.Marshal(m)
 	if err != nil {
@@ -86,9 +86,9 @@ func reply(ctx context.Context, amount int) error {
 	return nil
 }
 
-func buildSlackChatPostMessage(amount int) slackChatPostMessage {
+func buildSlackChatPostMessage(ch string, amount int) slackChatPostMessage {
 	return slackChatPostMessage{
-		Channel:  channel,
+		Channel:  ch,
 		Text:     "カード利用を登録しました",
 		Username: "MoneySaver",
 		Attachments: []slackAttachment{
