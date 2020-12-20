@@ -1,6 +1,6 @@
 steps:
   - id: build
-    name: 'docker:19'
+    name: gcr.io/cloud-builders/docker
     args:
       - build
       - --tag
@@ -9,7 +9,7 @@ steps:
       - ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:latest
       - .
   - id: push
-    name: 'docker:19'
+    name: gcr.io/cloud-builders/docker
     entrypoint: '/bin/bash'
     args:
       - -c
