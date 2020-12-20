@@ -1,0 +1,8 @@
+Dockerfile
+.envrc
+.gcloudignore
+.git
+.gitignore
+LICENSE
+README.md
+*_test.go
