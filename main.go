@@ -69,6 +69,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := reply(ctx, msg.Event.Channel, 12345); err != nil {
+		log.Printf("failed to reply: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
