@@ -1,0 +1,18 @@
+steps:
+  - id: build
+    name: 'docker:19'
+    args:
+      - build
+      - --tag ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:$COMMIT_SHA
+      - --tag ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:latest
+      - .
+  - id: push
+    name: 'docker:19'
+    entrypoint: '/bin/bash'
+    args:
+      - -c
+      - |-
+        docker push ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:$COMMIT_SHA
+        docker push ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:latest
+    waitFor: ['build']
+
