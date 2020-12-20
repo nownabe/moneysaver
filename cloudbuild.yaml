@@ -4,9 +4,9 @@ steps:
     args:
       - build
       - --tag
-      - ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:$COMMIT_SHA
+      - ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/containers/moneysaver:$COMMIT_SHA
       - --tag
-      - ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:latest
+      - ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/containers/moneysaver:latest
       - .
   - id: push
     name: gcr.io/cloud-builders/docker
@@ -14,7 +14,7 @@ steps:
     args:
       - -c
       - |-
-        docker push ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:$COMMIT_SHA
-        docker push ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/moneysaver:latest
+        docker push ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/containers/moneysaver:$COMMIT_SHA
+        docker push ${_LOCATION}-docker.pkg.dev/${PROJECT_ID}/containers/moneysaver:latest
     waitFor: ['build']
 
