@@ -59,7 +59,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	if msg.Challenge != "" {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"challenge":"%s"}`, msg.Challenge)
+		fmt.Fprintf(w, msg.Challenge)
 		return
 	}
 

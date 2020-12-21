@@ -17,6 +17,11 @@ func Test_handler_challenge(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("status code should be 200, but %d", rec.Code)
 	}
+
+	respBody := rec.Body.String()
+	if respBody != "challengetoken" {
+		t.Errorf("response should be 'challengetoken', but %s", respBody)
+	}
 }
 
 func Test_handler_else(t *testing.T) {
