@@ -6,17 +6,30 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"regexp"
+	"os"
+	"strconv"
+	"time"
 )
 
-var numRegexp *regexp.Regexp = regexp.MustCompile(`^\d+$`)
+var projectID = os.Getenv("PROJECT_ID")
 
 type slackEvent struct {
-	Channel string `json:"channel"`
-	Text    string `json:"text"`
+	Channel string  `json:"channel"`
+	Text    string  `json:"text"`
+	EventTS float64 `json:"event_ts"`
 }
 
+func (e slackEvent) timestamp() time.Time {
+	return time.Unix(int64(e.EventTS), 0)
+}
+
+func (e slackEvent) amount() (int64, error) {
+	return strconv.ParseInt(e.Text, 10, 64)
+}
+
+// https://api.slack.com/events-api#the-events-api__receiving-events__callback-field-overview
 type slackMessage struct {
+	// TODO: Token
 	Challenge string     `json:"challenge"`
 	TeamID    string     `json:"team_id"`
 	Event     slackEvent `json:"event"`
@@ -63,10 +76,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !numRegexp.Match([]byte(msg.Event.Text)) {
+	if _, err := msg.Event.amount(); err != nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+
+	if err := addRecord(ctx, msg); err != nil {
+		log.Printf("failed to add record: %v", err)
+		// TODO: reply error
+	}
+
+	/*
+		balance, err := aggregate(ctx, msg.Event.Channel)
+		if err != nil {
+			log.Printf("failed to aggregate: %v", err)
+			// TODO: reply error
+		}
+	*/
 
 	if err := reply(ctx, msg.Event.Channel, 12345); err != nil {
 		log.Printf("failed to reply: %v", err)
