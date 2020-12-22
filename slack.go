@@ -106,13 +106,13 @@ func buildSlackChatPostMessage(msg slackMessage, total int64) slackChatPostMessa
 						Short: true,
 					},
 					slackAttachmentField{
-						Title: "今月の設定上限額",
-						Value: humanize(limit),
+						Title: "今月の合計利用額",
+						Value: humanize(total),
 						Short: true,
 					},
 					slackAttachmentField{
-						Title: "今月の合計利用額",
-						Value: humanize(total),
+						Title: "今月の設定上限額",
+						Value: humanize(limit),
 						Short: true,
 					},
 				},
