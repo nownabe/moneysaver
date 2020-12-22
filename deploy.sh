@@ -14,7 +14,7 @@ gcloud run deploy moneysaver \
   --port 8080 \
   --service-account $SERVICE_ACCOUNT \
   --timeout 10s \
-  --set-env-vars SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN \
+  --set-env-vars SLACK_BOT_TOKEN=$SLACK_BOT_TOKEN,LIMITS=$LIMITS \
   --allow-unauthenticated \
   --region ${LOCATION}
 
