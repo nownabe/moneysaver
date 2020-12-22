@@ -78,14 +78,24 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := addRecord(ctx, msg); err != nil {
-		log.Printf("failed to add record: %v", err)
-		// TODO: reply error
+		e := xerrors.Errorf("failed to add record: %w", err)
+		log.Printf("%v", e)
+		if err := replyError(ctx, msg, e); err != nil {
+			log.Printf("failed to reply error: %v", err)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	total, err := aggregate(ctx, msg)
 	if err != nil {
-		log.Printf("failed to aggregate: %v", err)
-		// TODO: reply error
+		e := xerrors.Errorf("failed to aggregate: %w", err)
+		log.Printf("%v", e)
+		if err := replyError(ctx, msg, e); err != nil {
+			log.Printf("failed to reply error: %v", err)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	if err := replySuccess(ctx, msg, total); err != nil {
@@ -133,6 +143,16 @@ func replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
 				},
 			},
 		},
+	}
+
+	return sc.chatPostMessage(ctx, r)
+}
+
+func replyError(ctx context.Context, msg *slackMessage, err error) error {
+	r := &slackChatPostMessageReq{
+		Channel:  msg.Event.Channel,
+		Text:     err.Error(),
+		Username: "MoneySaver",
 	}
 
 	return sc.chatPostMessage(ctx, r)
