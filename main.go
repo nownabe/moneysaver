@@ -1,13 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
+
+	"golang.org/x/xerrors"
 )
 
-var cfg *config
+var (
+	cfg *config
+	sc  *slackClient
+)
 
 func init() {
 	c, err := newConfig()
@@ -15,6 +22,8 @@ func init() {
 		panic(err)
 	}
 	cfg = c
+
+	sc = newSlackClient(cfg.SlackBotToken)
 }
 
 func main() {
@@ -79,11 +88,68 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// TODO: reply error
 	}
 
-	if err := reply(ctx, msg, total); err != nil {
+	if err := replySuccess(ctx, msg, total); err != nil {
 		log.Printf("failed to reply: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
+	limit, ok := cfg.getLimit(msg.Event.Channel)
+	if !ok {
+		return xerrors.Errorf("limit is not configured: %s", msg.Event.Channel)
+	}
+
+	r := &slackChatPostMessageReq{
+		Channel:  msg.Event.Channel,
+		Text:     "カード利用を登録しました",
+		Username: "MoneySaver",
+		Attachments: []slackAttachment{
+			slackAttachment{
+				Fields: []slackAttachmentField{
+					slackAttachmentField{
+						Title: "利用額",
+						Value: humanize(msg.amount),
+						Short: true,
+					},
+					slackAttachmentField{
+						Title: "今月の利用可能残額",
+						Value: humanize(limit - total),
+						Short: true,
+					},
+					slackAttachmentField{
+						Title: "今月の合計利用額",
+						Value: humanize(total),
+						Short: true,
+					},
+					slackAttachmentField{
+						Title: "今月の設定上限額",
+						Value: humanize(limit),
+						Short: true,
+					},
+				},
+			},
+		},
+	}
+
+	return sc.chatPostMessage(ctx, r)
+}
+
+func humanize(n int64) string {
+	s := fmt.Sprint(n)
+	l := (len(s) + 3 - 1) / 3
+	parts := make([]string, l)
+
+	for i := 0; i < l; i++ {
+		start := len(s) - (l-i)*3
+		end := start + 3
+		if start < 0 {
+			start = 0
+		}
+		parts[i] = s[start:end]
+	}
+	return "¥" + strings.Join(parts, ",")
 }
