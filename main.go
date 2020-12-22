@@ -89,6 +89,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Messages in channels not to be processed
+	if _, ok := cfg.getLimit(msg.Event.Channel); !ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if err := store.add(ctx, msg); err != nil {
 		e := xerrors.Errorf("failed to add record: %w", err)
 		log.Printf("%v", e)
