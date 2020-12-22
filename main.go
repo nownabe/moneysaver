@@ -18,13 +18,17 @@ var (
 )
 
 type slackEvent struct {
-	Channel string  `json:"channel"`
-	Text    string  `json:"text"`
-	TS      float64 `json:"ts"`
+	Channel string `json:"channel"`
+	Text    string `json:"text"`
+	TS      string `json:"ts"`
 }
 
-func (e slackEvent) timestamp() time.Time {
-	return time.Unix(int64(e.TS), 0)
+func (e slackEvent) timestamp() (time.Time, error) {
+	ts, err := strconv.ParseFloat(e.TS, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(int64(ts), 0), nil
 }
 
 func (e slackEvent) amount() (int64, error) {

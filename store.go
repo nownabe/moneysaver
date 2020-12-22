@@ -22,7 +22,12 @@ func addRecord(ctx context.Context, msg slackMessage) error {
 		return xerrors.Errorf("failed to build firestore client: %w", err)
 	}
 
-	month := msg.Event.timestamp().Format("2006-01")
+	ts, err := msg.Event.timestamp()
+	if err != nil {
+		return xerrors.Errorf("failed to get timestamp: %w", err)
+	}
+
+	month := ts.Format("2006-01")
 	amount, err := msg.Event.amount()
 	if err != nil {
 		return xerrors.Errorf("failed to get amount: %w", err)
@@ -31,7 +36,7 @@ func addRecord(ctx context.Context, msg slackMessage) error {
 	chDoc := client.Collection(collectionName).Doc(msg.Event.Channel)
 
 	if _, _, err := chDoc.Collection(month).Add(ctx, &record{
-		Timestamp: msg.Event.timestamp(),
+		Timestamp: ts,
 		Amount:    amount,
 	}); err != nil {
 		return xerrors.Errorf("failed to add document: %w", err)
@@ -46,7 +51,12 @@ func aggregate(ctx context.Context, msg slackMessage) (int64, error) {
 		return -1, xerrors.Errorf("failed to build firestore client: %w", err)
 	}
 
-	month := msg.Event.timestamp().Format("2006-01")
+	ts, err := msg.Event.timestamp()
+	if err != nil {
+		return -1, xerrors.Errorf("failed to get timestamp: %w", err)
+	}
+
+	month := ts.Format("2006-01")
 
 	chDoc := client.Collection(collectionName).Doc(msg.Event.Channel)
 
