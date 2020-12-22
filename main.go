@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	cfg *config
-	sc  *slackClient
+	cfg   *config
+	sc    *slackClient
+	store *storeClient
 )
 
 func init() {
@@ -24,6 +25,12 @@ func init() {
 	cfg = c
 
 	sc = newSlackClient(cfg.SlackBotToken)
+
+	s, err := newStoreClient(context.Background(), cfg.ProjectID)
+	if err != nil {
+		panic(err)
+	}
+	store = s
 }
 
 func main() {
@@ -77,7 +84,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := addRecord(ctx, msg); err != nil {
+	if err := store.add(ctx, msg); err != nil {
 		e := xerrors.Errorf("failed to add record: %w", err)
 		log.Printf("%v", e)
 		if err := replyError(ctx, msg, e); err != nil {
@@ -87,7 +94,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	total, err := aggregate(ctx, msg)
+	total, err := store.total(ctx, msg)
 	if err != nil {
 		e := xerrors.Errorf("failed to aggregate: %w", err)
 		log.Printf("%v", e)

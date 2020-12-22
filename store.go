@@ -9,6 +9,8 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// TODO: Refactor
+
 const collectionName = "channels"
 
 type record struct {
@@ -16,15 +18,24 @@ type record struct {
 	Amount    int64     `firestore:"amount"`
 }
 
-func addRecord(ctx context.Context, msg *slackMessage) error {
-	client, err := firestore.NewClient(ctx, cfg.ProjectID)
+type storeClient struct {
+	firestore *firestore.Client
+}
+
+func newStoreClient(ctx context.Context, projectID string) (*storeClient, error) {
+	c, err := firestore.NewClient(ctx, projectID)
 	if err != nil {
-		return xerrors.Errorf("failed to build firestore client: %w", err)
+		return nil, xerrors.Errorf("failed to build firestore client: %w", err)
 	}
+	return &storeClient{firestore: c}, nil
+}
 
-	chDoc := client.Collection(collectionName).Doc(msg.Event.Channel)
+func (s *storeClient) collection(msg *slackMessage) *firestore.CollectionRef {
+	return s.firestore.Collection(collectionName).Doc(msg.Event.Channel).Collection(msg.month())
+}
 
-	if _, _, err := chDoc.Collection(msg.month()).Add(ctx, &record{
+func (s *storeClient) add(ctx context.Context, msg *slackMessage) error {
+	if _, _, err := s.collection(msg).Add(ctx, &record{
 		Timestamp: msg.timestamp,
 		Amount:    msg.amount,
 	}); err != nil {
@@ -34,18 +45,11 @@ func addRecord(ctx context.Context, msg *slackMessage) error {
 	return nil
 }
 
-func aggregate(ctx context.Context, msg *slackMessage) (int64, error) {
-	client, err := firestore.NewClient(ctx, cfg.ProjectID)
-	if err != nil {
-		return -1, xerrors.Errorf("failed to build firestore client: %w", err)
-	}
-
-	chDoc := client.Collection(collectionName).Doc(msg.Event.Channel)
-
+func (s *storeClient) total(ctx context.Context, msg *slackMessage) (int64, error) {
 	var r record
 	var total int64
 
-	docsIter := chDoc.Collection(msg.month()).Documents(ctx)
+	docsIter := s.collection(msg).Documents(ctx)
 	for {
 		doc, err := docsIter.Next()
 		if err == iterator.Done {
