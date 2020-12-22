@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	token string = os.Getenv("SLACK_BOT_TOKEN")
-	// channel string = os.Getenv("SLACK_CHANNEL")
+	token = os.Getenv("SLACK_BOT_TOKEN")
 )
 
 type slackChatPostMessage struct {
@@ -41,8 +40,8 @@ type slackResponse struct {
 	Error string `json:"error"`
 }
 
-func reply(ctx context.Context, ch string, amount int) error {
-	m := buildSlackChatPostMessage(ch, amount)
+func reply(ctx context.Context, msg slackMessage, total int64) error {
+	m := buildSlackChatPostMessage(msg, total)
 
 	reqBody, err := json.Marshal(m)
 	if err != nil {
@@ -86,9 +85,16 @@ func reply(ctx context.Context, ch string, amount int) error {
 	return nil
 }
 
-func buildSlackChatPostMessage(ch string, amount int) slackChatPostMessage {
+func buildSlackChatPostMessage(msg slackMessage, total int64) slackChatPostMessage {
+	amount, err := msg.Event.amount()
+	if err != nil {
+		panic(err)
+	}
+
+	limit := limits[msg.Event.Channel]
+
 	return slackChatPostMessage{
-		Channel:  ch,
+		Channel:  msg.Event.Channel,
 		Text:     "カード利用を登録しました",
 		Username: "MoneySaver",
 		Attachments: []slackAttachment{
@@ -101,17 +107,17 @@ func buildSlackChatPostMessage(ch string, amount int) slackChatPostMessage {
 					},
 					slackAttachmentField{
 						Title: "今月の利用可能残額",
-						Value: "xxxx円",
+						Value: humanize(limit - total),
 						Short: true,
 					},
 					slackAttachmentField{
 						Title: "今月の設定上限額",
-						Value: "xxxx円",
+						Value: humanize(limit),
 						Short: true,
 					},
 					slackAttachmentField{
 						Title: "今月の合計利用額",
-						Value: "xxxx円",
+						Value: humanize(total),
 						Short: true,
 					},
 				},
@@ -120,7 +126,7 @@ func buildSlackChatPostMessage(ch string, amount int) slackChatPostMessage {
 	}
 }
 
-func humanize(n int) string {
+func humanize(n int64) string {
 	s := fmt.Sprint(n)
 	l := (len(s) + 3 - 1) / 3
 	parts := make([]string, l)

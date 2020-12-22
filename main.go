@@ -8,10 +8,14 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
-var projectID = os.Getenv("PROJECT_ID")
+var (
+	limits    = map[string]int64{}
+	projectID = os.Getenv("PROJECT_ID")
+)
 
 type slackEvent struct {
 	Channel string  `json:"channel"`
@@ -36,9 +40,23 @@ type slackMessage struct {
 }
 
 func main() {
+	parseLimits()
 	http.HandleFunc("/", handler)
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("failed to listen and serve: %v", err)
+	}
+}
+
+func parseLimits() {
+	chs := strings.Split(os.Getenv("LIMITS"), ",")
+	for _, ch := range chs {
+		parts := strings.Split(ch, ":")
+		l, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			panic(fmt.Sprintf("failed to parse LIMITS: %v", err))
+		}
+
+		limits[parts[0]] = l
 	}
 }
 
@@ -86,15 +104,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// TODO: reply error
 	}
 
-	/*
-		balance, err := aggregate(ctx, msg.Event.Channel)
-		if err != nil {
-			log.Printf("failed to aggregate: %v", err)
-			// TODO: reply error
-		}
-	*/
+	total, err := aggregate(ctx, msg)
+	if err != nil {
+		log.Printf("failed to aggregate: %v", err)
+		// TODO: reply error
+	}
 
-	if err := reply(ctx, msg.Event.Channel, 12345); err != nil {
+	if err := reply(ctx, msg, total); err != nil {
 		log.Printf("failed to reply: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
