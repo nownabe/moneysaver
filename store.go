@@ -17,7 +17,7 @@ type record struct {
 }
 
 func addRecord(ctx context.Context, msg *slackMessage) error {
-	client, err := firestore.NewClient(ctx, projectID)
+	client, err := firestore.NewClient(ctx, cfg.ProjectID)
 	if err != nil {
 		return xerrors.Errorf("failed to build firestore client: %w", err)
 	}
@@ -35,7 +35,7 @@ func addRecord(ctx context.Context, msg *slackMessage) error {
 }
 
 func aggregate(ctx context.Context, msg *slackMessage) (int64, error) {
-	client, err := firestore.NewClient(ctx, projectID)
+	client, err := firestore.NewClient(ctx, cfg.ProjectID)
 	if err != nil {
 		return -1, xerrors.Errorf("failed to build firestore client: %w", err)
 	}

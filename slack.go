@@ -7,14 +7,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 
 	"golang.org/x/xerrors"
-)
-
-var (
-	token = os.Getenv("SLACK_BOT_TOKEN")
 )
 
 type slackChatPostMessage struct {
@@ -53,7 +48,7 @@ func reply(ctx context.Context, msg *slackMessage, total int64) error {
 		return xerrors.Errorf("failed to build http request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+cfg.SlackBotToken)
 
 	client := &http.Client{}
 
@@ -86,7 +81,7 @@ func reply(ctx context.Context, msg *slackMessage, total int64) error {
 }
 
 func buildSlackChatPostMessage(msg *slackMessage, total int64) slackChatPostMessage {
-	limit := limits[msg.Event.Channel]
+	limit, _ := cfg.getLimit(msg.Event.Channel)
 
 	return slackChatPostMessage{
 		Channel:  msg.Event.Channel,

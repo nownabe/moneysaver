@@ -5,34 +5,22 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
-	"strings"
 )
 
-var (
-	limits    = map[string]int64{}
-	projectID = os.Getenv("PROJECT_ID")
-)
+var cfg *config
+
+func init() {
+	c, err := newConfig()
+	if err != nil {
+		panic(err)
+	}
+	cfg = c
+}
 
 func main() {
-	parseLimits()
 	http.HandleFunc("/", handler)
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("failed to listen and serve: %v", err)
-	}
-}
-
-func parseLimits() {
-	chs := strings.Split(os.Getenv("LIMITS"), ",")
-	for _, ch := range chs {
-		parts := strings.Split(ch, ":")
-		l, err := strconv.ParseInt(parts[1], 10, 64)
-		if err != nil {
-			panic(fmt.Sprintf("failed to parse LIMITS: %v", err))
-		}
-
-		limits[parts[0]] = l
 	}
 }
 
