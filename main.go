@@ -114,9 +114,10 @@ func replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
 	}
 
 	r := &slackChatPostMessageReq{
-		Channel:  msg.Event.Channel,
-		Text:     "カード利用を登録しました",
-		Username: "MoneySaver",
+		Channel:   msg.Event.Channel,
+		Text:      "カード利用を登録しました",
+		Username:  "MoneySaver",
+		IconEmoji: ":money_with_wings:",
 		Attachments: []slackAttachment{
 			slackAttachment{
 				Fields: []slackAttachmentField{
@@ -150,9 +151,10 @@ func replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
 
 func replyError(ctx context.Context, msg *slackMessage, err error) error {
 	r := &slackChatPostMessageReq{
-		Channel:  msg.Event.Channel,
-		Text:     err.Error(),
-		Username: "MoneySaver",
+		Channel:   msg.Event.Channel,
+		Text:      err.Error(),
+		Username:  "MoneySaver",
+		IconEmoji: ":money_with_wings:",
 	}
 
 	return sc.chatPostMessage(ctx, r)
