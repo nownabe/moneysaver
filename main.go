@@ -81,6 +81,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	log.Printf("%s", body)
+
 	var msg slackMessage
 	if err := json.Unmarshal(body, &msg); err != nil {
 		log.Printf("failed to unmarshal request body: %v", err)
