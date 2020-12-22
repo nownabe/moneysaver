@@ -40,7 +40,7 @@ type slackResponse struct {
 	Error string `json:"error"`
 }
 
-func reply(ctx context.Context, msg slackMessage, total int64) error {
+func reply(ctx context.Context, msg *slackMessage, total int64) error {
 	m := buildSlackChatPostMessage(msg, total)
 
 	reqBody, err := json.Marshal(m)
@@ -86,11 +86,6 @@ func reply(ctx context.Context, msg slackMessage, total int64) error {
 }
 
 func buildSlackChatPostMessage(msg slackMessage, total int64) slackChatPostMessage {
-	amount, err := msg.Event.amount()
-	if err != nil {
-		panic(err)
-	}
-
 	limit := limits[msg.Event.Channel]
 
 	return slackChatPostMessage{
@@ -102,7 +97,7 @@ func buildSlackChatPostMessage(msg slackMessage, total int64) slackChatPostMessa
 				Fields: []slackAttachmentField{
 					slackAttachmentField{
 						Title: "利用額",
-						Value: humanize(amount),
+						Value: humanize(msg.amount),
 						Short: true,
 					},
 					slackAttachmentField{

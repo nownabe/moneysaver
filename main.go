@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,39 +8,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var (
 	limits    = map[string]int64{}
 	projectID = os.Getenv("PROJECT_ID")
 )
-
-type slackEvent struct {
-	Channel string `json:"channel"`
-	Text    string `json:"text"`
-	TS      string `json:"ts"`
-}
-
-func (e slackEvent) timestamp() (time.Time, error) {
-	ts, err := strconv.ParseFloat(e.TS, 64)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return time.Unix(int64(ts), 0), nil
-}
-
-func (e slackEvent) amount() (int64, error) {
-	return strconv.ParseInt(e.Text, 10, 64)
-}
-
-// https://api.slack.com/events-api#the-events-api__receiving-events__callback-field-overview
-type slackMessage struct {
-	// TODO: Token
-	Challenge string     `json:"challenge"`
-	TeamID    string     `json:"team_id"`
-	Event     slackEvent `json:"event"`
-}
 
 func main() {
 	parseLimits()
@@ -87,20 +59,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("%s", body)
 
-	var msg slackMessage
-	if err := json.Unmarshal(body, &msg); err != nil {
-		log.Printf("failed to unmarshal request body: %v", err)
+	msg, err := newSlackMessage(body)
+	if err != nil {
+		log.Printf("unexpexted request body: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	if msg.Challenge != "" {
+	// Challenge request
+	// https://api.slack.com/events-api#the-events-api__subscribing-to-event-types__events-api-request-urls__request-url-configuration--verification
+	if msg.isChallenge() {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, msg.Challenge)
 		return
 	}
 
-	if _, err := msg.Event.amount(); err != nil {
+	// Messages not to be processed
+	if !msg.ok {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}

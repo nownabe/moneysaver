@@ -16,28 +16,17 @@ type record struct {
 	Amount    int64     `firestore:"amount"`
 }
 
-func addRecord(ctx context.Context, msg slackMessage) error {
+func addRecord(ctx context.Context, msg *slackMessage) error {
 	client, err := firestore.NewClient(ctx, projectID)
 	if err != nil {
 		return xerrors.Errorf("failed to build firestore client: %w", err)
 	}
 
-	ts, err := msg.Event.timestamp()
-	if err != nil {
-		return xerrors.Errorf("failed to get timestamp: %w", err)
-	}
-
-	month := ts.Format("2006-01")
-	amount, err := msg.Event.amount()
-	if err != nil {
-		return xerrors.Errorf("failed to get amount: %w", err)
-	}
-
 	chDoc := client.Collection(collectionName).Doc(msg.Event.Channel)
 
-	if _, _, err := chDoc.Collection(month).Add(ctx, &record{
-		Timestamp: ts,
-		Amount:    amount,
+	if _, _, err := chDoc.Collection(msg.month()).Add(ctx, &record{
+		Timestamp: msg.timestamp,
+		Amount:    msg.amount,
 	}); err != nil {
 		return xerrors.Errorf("failed to add document: %w", err)
 	}
@@ -45,25 +34,18 @@ func addRecord(ctx context.Context, msg slackMessage) error {
 	return nil
 }
 
-func aggregate(ctx context.Context, msg slackMessage) (int64, error) {
+func aggregate(ctx context.Context, msg *slackMessage) (int64, error) {
 	client, err := firestore.NewClient(ctx, projectID)
 	if err != nil {
 		return -1, xerrors.Errorf("failed to build firestore client: %w", err)
 	}
-
-	ts, err := msg.Event.timestamp()
-	if err != nil {
-		return -1, xerrors.Errorf("failed to get timestamp: %w", err)
-	}
-
-	month := ts.Format("2006-01")
 
 	chDoc := client.Collection(collectionName).Doc(msg.Event.Channel)
 
 	var r record
 	var total int64
 
-	docsIter := chDoc.Collection(month).Documents(ctx)
+	docsIter := chDoc.Collection(msg.month()).Documents(ctx)
 	for {
 		doc, err := docsIter.Next()
 		if err == iterator.Done {
