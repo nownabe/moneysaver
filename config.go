@@ -6,9 +6,10 @@ import (
 )
 
 type config struct {
-	ProjectID     string           `required:"true" split_words:"true"`
-	Limits        map[string]int64 `reqired:"true"`
-	SlackBotToken string           `required:"true" split_words:"true"`
+	ProjectID              string           `required:"true" split_words:"true"`
+	Limits                 map[string]int64 `reqired:"true"`
+	SlackBotToken          string           `required:"true" split_words:"true"`
+	SlackVerificationToken string           `required:"true" split_words:"true"`
 }
 
 func newConfig() (*config, error) {

@@ -16,7 +16,7 @@ type slackEvent struct {
 
 // https://api.slack.com/events-api#the-events-api__receiving-events__callback-field-overview
 type slackMessage struct {
-	// TODO: Token
+	Token     string     `json:"token"`
 	Challenge string     `json:"challenge"`
 	TeamID    string     `json:"team_id"`
 	Event     slackEvent `json:"event"`

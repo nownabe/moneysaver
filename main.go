@@ -78,6 +78,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if msg.Token != cfg.SlackVerificationToken {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	// Messages not to be processed
 	if !msg.ok {
 		w.WriteHeader(http.StatusNoContent)
