@@ -85,7 +85,7 @@ func reply(ctx context.Context, msg *slackMessage, total int64) error {
 	return nil
 }
 
-func buildSlackChatPostMessage(msg slackMessage, total int64) slackChatPostMessage {
+func buildSlackChatPostMessage(msg *slackMessage, total int64) slackChatPostMessage {
 	limit := limits[msg.Event.Channel]
 
 	return slackChatPostMessage{
