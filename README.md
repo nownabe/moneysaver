@@ -1,9 +1,9 @@
 MoneySaver
 ==========
 
-![sample](./sample.png)
-
 MoneySaver is a Slack App that counts the amount of money you spend this month and tells you how much money you can have in this month.
+
+![sample](./sample.png)
 
 ## Deploy
 
