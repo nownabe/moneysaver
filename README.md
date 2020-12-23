@@ -19,6 +19,7 @@ See examples.
 ## Docker images
 
 * [Docker Hub](https://hub.docker.com/repository/docker/nownabe/moneysaver)
+* [GitHub Container Registry](https://github.com/users/nownabe/packages/container/package/moneysaver)
 
 ## Environment variables
 
