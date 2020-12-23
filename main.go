@@ -17,7 +17,9 @@ var (
 	store *storeClient
 )
 
-func init() {
+func main() {
+	// Initialize
+
 	c, err := newConfig()
 	if err != nil {
 		panic(err)
@@ -31,10 +33,11 @@ func init() {
 		panic(err)
 	}
 	store = s
-}
 
-func main() {
 	http.HandleFunc("/", handler)
+
+	// Start server
+
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("failed to listen and serve: %v", err)
 	}
