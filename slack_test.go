@@ -7,7 +7,7 @@ import (
 
 func Test_humanize(t *testing.T) {
 	cases := []struct {
-		n int
+		n int64
 		e string
 	}{
 		{n: 1, e: "¥1"},

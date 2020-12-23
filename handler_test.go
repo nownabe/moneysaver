@@ -25,7 +25,8 @@ func Test_handler_challenge(t *testing.T) {
 }
 
 func Test_handler_else(t *testing.T) {
-	body := bytes.NewBufferString(`{"event":{"text":"not number"}}`)
+	cfg = &config{}
+	body := bytes.NewBufferString(`{"event":{"text":"not number","ts":"1.23"}}`)
 	req := httptest.NewRequest("POST", "/", body)
 	req.Header.Add("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
