@@ -33,6 +33,10 @@ func newSlackMessage(b []byte) (*slackMessage, error) {
 		return nil, xerrors.Errorf("slack message parse error: %w", err)
 	}
 
+	if msg.isChallenge() {
+		return &msg, nil
+	}
+
 	ts, err := strconv.ParseFloat(msg.Event.TS, 64)
 	if err != nil {
 		return nil, xerrors.Errorf("parse error event.ts: %w", err)

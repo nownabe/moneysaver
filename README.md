@@ -1,9 +1,13 @@
 MoneySaver
 ==========
 
-![sample](./sample.png)
+[![Go Report Card](https://goreportcard.com/badge/github.com/nownabe/moneysaver)](https://goreportcard.com/report/github.com/nownabe/moneysaver)
+[![codecov](https://codecov.io/gh/nownabe/moneysaver/branch/main/graph/badge.svg)](https://codecov.io/gh/nownabe/moneysaver)
+![GitHub License](https://img.shields.io/github/license/nownabe/moneysaver)
 
 MoneySaver is a Slack App that counts the amount of money you spend this month and tells you how much money you can have in this month.
+
+![sample](./sample.png)
 
 ## Deploy
 
@@ -15,6 +19,7 @@ See examples.
 ## Docker images
 
 * [Docker Hub](https://hub.docker.com/repository/docker/nownabe/moneysaver)
+* [GitHub Container Registry](https://github.com/users/nownabe/packages/container/package/moneysaver)
 
 ## Environment variables
 
