@@ -8,12 +8,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/nownabe/moneysaver/slack"
 	"golang.org/x/xerrors"
 )
 
 var (
 	cfg   *config
-	sc    *slackClient
+	sc    slack.Client
 	store *storeClient
 )
 
@@ -26,7 +27,7 @@ func main() {
 	}
 	cfg = c
 
-	sc = newSlackClient(cfg.SlackBotToken)
+	sc = slack.New(cfg.SlackBotToken)
 
 	s, err := newStoreClient(context.Background(), cfg.ProjectID)
 	if err != nil {
@@ -135,30 +136,30 @@ func replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
 		return xerrors.Errorf("limit is not configured: %s", msg.Event.Channel)
 	}
 
-	r := &slackChatPostMessageReq{
+	r := &slack.ChatPostMessageReq{
 		Channel:   msg.Event.Channel,
 		Text:      "カード利用を登録しました",
 		Username:  "MoneySaver",
 		IconEmoji: ":money_with_wings:",
-		Attachments: []slackAttachment{
-			slackAttachment{
-				Fields: []slackAttachmentField{
-					slackAttachmentField{
+		Attachments: []*slack.Attachment{
+			{
+				Fields: []*slack.AttachmentField{
+					{
 						Title: "利用額",
 						Value: humanize(msg.amount),
 						Short: true,
 					},
-					slackAttachmentField{
+					{
 						Title: "今月の利用可能残額",
 						Value: humanize(limit - total),
 						Short: true,
 					},
-					slackAttachmentField{
+					{
 						Title: "今月の合計利用額",
 						Value: humanize(total),
 						Short: true,
 					},
-					slackAttachmentField{
+					{
 						Title: "今月の設定上限額",
 						Value: humanize(limit),
 						Short: true,
@@ -168,18 +169,18 @@ func replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
 		},
 	}
 
-	return sc.chatPostMessage(ctx, r)
+	return sc.ChatPostMessage(ctx, r)
 }
 
 func replyError(ctx context.Context, msg *slackMessage, err error) error {
-	r := &slackChatPostMessageReq{
+	r := &slack.ChatPostMessageReq{
 		Channel:   msg.Event.Channel,
 		Text:      err.Error(),
 		Username:  "MoneySaver",
 		IconEmoji: ":money_with_wings:",
 	}
 
-	return sc.chatPostMessage(ctx, r)
+	return sc.ChatPostMessage(ctx, r)
 }
 
 func humanize(n int64) string {

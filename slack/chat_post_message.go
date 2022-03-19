@@ -1,4 +1,4 @@
-package main
+package slack
 
 import (
 	"bytes"
@@ -10,42 +10,34 @@ import (
 	"golang.org/x/xerrors"
 )
 
-type slackClient struct {
-	token  string
-	client *http.Client
+// Attachment is an attachment.
+type Attachment struct {
+	Fields []*AttachmentField `json:"fields"`
 }
 
-type slackAttachment struct {
-	Fields []slackAttachmentField `json:"fields"`
-}
-
-type slackAttachmentField struct {
+// AttachmentField is an attachment field.
+type AttachmentField struct {
 	Title string `json:"title"`
 	Value string `json:"value"`
 	Short bool   `json:"short"`
 }
 
-type slackAPIResponse struct {
+// ChatPostMessageReq is a request for chat.postMessage method.
+// https://api.slack.com/methods/chat.postMessage
+type ChatPostMessageReq struct {
+	Channel     string        `json:"channel"`
+	IconEmoji   string        `json:"icon_emoji,omitempty"`
+	Text        string        `json:"text"`
+	Username    string        `json:"username,omitempty"`
+	Attachments []*Attachment `json:"attachments"`
+}
+
+type chatPostMessageRes struct {
 	OK    bool   `json:"ok"`
 	Error string `json:"error"`
 }
 
-func newSlackClient(token string) *slackClient {
-	return &slackClient{
-		token:  token,
-		client: &http.Client{},
-	}
-}
-
-type slackChatPostMessageReq struct {
-	Channel     string            `json:"channel"`
-	IconEmoji   string            `json:"icon_emoji,omitempty"`
-	Text        string            `json:"text"`
-	Username    string            `json:"username,omitempty"`
-	Attachments []slackAttachment `json:"attachments"`
-}
-
-func (c *slackClient) chatPostMessage(ctx context.Context, r *slackChatPostMessageReq) error {
+func (c *client) ChatPostMessage(ctx context.Context, r *ChatPostMessageReq) error {
 	reqBody, err := json.Marshal(r)
 	if err != nil {
 		return xerrors.Errorf("failed to marshal slack chat.postMessage request: %w", err)
@@ -56,7 +48,7 @@ func (c *slackClient) chatPostMessage(ctx context.Context, r *slackChatPostMessa
 		return xerrors.Errorf("failed to build http request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+cfg.SlackBotToken)
+	req.Header.Set("Authorization", "Bearer "+c.token)
 
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -74,7 +66,7 @@ func (c *slackClient) chatPostMessage(ctx context.Context, r *slackChatPostMessa
 			"slack chat.postMessage failed with status code %d (%s)", resp.StatusCode, body)
 	}
 
-	var sres slackAPIResponse
+	var sres chatPostMessageRes
 	if err := json.Unmarshal(body, &sres); err != nil {
 		return xerrors.Errorf("failed to unmarshal response body: %w", err)
 	}
