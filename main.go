@@ -74,10 +74,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Challenge request
-	// https://api.slack.com/events-api#the-events-api__subscribing-to-event-types__events-api-request-urls__request-url-configuration--verification
+	// https://api.slack.com/apis/connections/events-api#the-events-api__subscribing-to-event-types__events-api-request-urls__request-url-configuration--verification
 	if msg.isChallenge() {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, msg.Challenge)
+		w.Header().Add("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"challenge":"%s"}`, msg.Challenge)
 		return
 	}
 

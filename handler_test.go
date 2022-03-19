@@ -18,9 +18,14 @@ func Test_handler_challenge(t *testing.T) {
 		t.Errorf("status code should be 200, but %d", rec.Code)
 	}
 
+	contentType := rec.Header().Get("Content-Type")
+	if contentType != "application/json" {
+		t.Errorf("Content-Type header should be 'application/json', but %s", contentType)
+	}
+
 	respBody := rec.Body.String()
-	if respBody != "challengetoken" {
-		t.Errorf("response should be 'challengetoken', but %s", respBody)
+	if respBody != `{"challenge":"challengetoken"}` {
+		t.Errorf(`response should be '{"challenge":"challengetoken"}', but %s`, respBody)
 	}
 }
 
