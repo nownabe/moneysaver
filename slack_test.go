@@ -20,3 +20,7 @@ func (c *slackMock) ChatPostMessage(ctx context.Context, r *slack.ChatPostMessag
 	c.recorder = append(c.recorder, r)
 	return nil
 }
+
+func (c *slackMock) requests() []*slack.ChatPostMessageReq {
+	return c.recorder
+}
