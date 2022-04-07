@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  firestore:
+    image: google/cloud-sdk:emulators
+    command: gcloud beta emulators firestore start --host-port 0.0.0.0:8937
+    ports:
+      - 8937:8937
+
