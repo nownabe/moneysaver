@@ -148,7 +148,7 @@ func (h *handler) replySuccess(ctx context.Context, msg *slackMessage, total int
 func (h *handler) replyError(ctx context.Context, msg *slackMessage, err error) error {
 	r := &slack.ChatPostMessageReq{
 		Channel:   msg.Event.Channel,
-		Text:      err.Error(),
+		Text:      "```\n" + err.Error() + "\n```",
 		Username:  "MoneySaver",
 		IconEmoji: ":money_with_wings:",
 	}
