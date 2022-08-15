@@ -7,7 +7,7 @@ import (
 
 type config struct {
 	ProjectID              string           `required:"true" split_words:"true"`
-	Limits                 map[string]int64 `reqired:"true"`
+	Limits                 map[string]int64 `required:"true"`
 	SlackBotToken          string           `required:"true" split_words:"true"`
 	SlackVerificationToken string           `required:"true" split_words:"true"`
 }
