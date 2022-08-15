@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -59,6 +58,8 @@ func assertReqs(t *testing.T, expect, actual []*slack.ChatPostMessageReq) {
 }
 
 func Test_event_handler(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]struct {
 		requestBody string
 		code        int
@@ -85,8 +86,6 @@ func Test_event_handler(t *testing.T) {
 		c := c
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-
-			fmt.Println(t.Name())
 
 			mock := newSlackMock()
 

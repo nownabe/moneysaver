@@ -13,10 +13,10 @@ const (
 	firestoreEmulatorHost = "localhost:8937"
 )
 
-var store *storeClient
-
 func TestMain(m *testing.M) {
-	os.Setenv("FIRESTORE_EMULATOR_HOST", firestoreEmulatorHost)
+	if err := os.Setenv("FIRESTORE_EMULATOR_HOST", firestoreEmulatorHost); err != nil {
+		panic(err)
+	}
 
 	os.Exit(m.Run())
 }
@@ -45,7 +45,8 @@ func getStore(t *testing.T) *storeClient {
 func flushStore(t *testing.T) {
 	t.Helper()
 
-	url := "http://" + firestoreEmulatorHost + "/emulator/v1/projects/" + test2Project(t) + "/databases/(default)/documents"
+	url := "http://" + firestoreEmulatorHost
+	url += "/emulator/v1/projects/" + test2Project(t) + "/databases/(default)/documents"
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
