@@ -35,11 +35,9 @@ func (s *storeClient) collection(msg *slackMessage) *firestore.CollectionRef {
 }
 
 func (s *storeClient) add(ctx context.Context, msg *slackMessage) error {
-	if _, _, err := s.collection(msg).Add(ctx, &record{
-		Timestamp: msg.timestamp,
-		Amount:    msg.amount,
-	}); err != nil {
-		return xerrors.Errorf("failed to add document: %w", err)
+	docRef := s.collection(msg).Doc(msg.Event.TS)
+	if _, err := docRef.Set(ctx, &record{msg.timestamp, msg.amount}); err != nil {
+		return xerrors.Errorf("docRef.Set: %w", err)
 	}
 
 	return nil
