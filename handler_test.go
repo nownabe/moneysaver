@@ -22,7 +22,7 @@ func Test_handler_challenge(t *testing.T) {
 	req.Header.Add("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	h.ServeHTTP(rec, req)
+	h.handleEvents(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("status code should be 200, but %d", rec.Code)
@@ -105,7 +105,7 @@ func Test_event_handler(t *testing.T) {
 			req.Header.Add("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 
-			h.ServeHTTP(rec, req)
+			h.handleEvents(rec, req)
 
 			if rec.Code != c.code {
 				t.Errorf("status code should be %d, but %d", c.code, rec.Code)

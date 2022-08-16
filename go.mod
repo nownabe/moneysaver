@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	cloud.google.com/go/firestore v1.6.1
+	github.com/go-chi/chi/v5 v5.0.7
 	github.com/kelseyhightower/envconfig v1.4.0
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
 	google.golang.org/api v0.85.0

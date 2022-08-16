@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/nownabe/moneysaver/slack"
@@ -17,33 +16,32 @@ type handler struct {
 	slack slack.Client
 }
 
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if r.Header.Get("Content-Type") != "application/json" {
-		w.WriteHeader(http.StatusUnsupportedMediaType)
-		return
-	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("failed to read request body: %v", err)
+		logger.Printf("failed to read request body: %v", err)
 		w.WriteHeader(http.StatusConflict)
+
 		return
 	}
 	defer r.Body.Close()
 
-	log.Printf("%s", body)
+	logger.Printf("%s", body)
+
+	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
+		logger.Printf("Unsupported content type: %s", contentType)
+		w.WriteHeader(http.StatusUnsupportedMediaType)
+
+		return
+	}
 
 	msg, err := newSlackMessage(body)
 	if err != nil {
-		log.Printf("unexpexted request body: %v", err)
+		logger.Printf("unexpexted request body: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
+
 		return
 	}
 
@@ -53,6 +51,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"challenge":"%s"}`, msg.Challenge)
+
 		return
 	}
 
@@ -75,28 +74,35 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.store.add(ctx, msg); err != nil {
 		e := xerrors.Errorf("failed to add record: %w", err)
-		log.Printf("%v", e)
+		logger.Printf("%v", e)
+
 		if err := h.replyError(ctx, msg, e); err != nil {
-			log.Printf("failed to reply error: %v", err)
+			logger.Printf("failed to reply error: %v", err)
 		}
+
 		w.WriteHeader(http.StatusInternalServerError)
+
 		return
 	}
 
 	total, err := h.store.total(ctx, msg)
 	if err != nil {
 		e := xerrors.Errorf("failed to aggregate: %w", err)
-		log.Printf("%v", e)
+		logger.Printf("%v", e)
+
 		if err := h.replyError(ctx, msg, e); err != nil {
-			log.Printf("failed to reply error: %v", err)
+			logger.Printf("failed to reply error: %v", err)
 		}
+
 		w.WriteHeader(http.StatusInternalServerError)
+
 		return
 	}
 
 	if err := h.replySuccess(ctx, msg, total); err != nil {
-		log.Printf("failed to reply: %v", err)
+		logger.Printf("failed to reply: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
+
 		return
 	}
 
