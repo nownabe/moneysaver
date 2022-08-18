@@ -11,6 +11,8 @@ import (
 )
 
 func Test_handler_challenge(t *testing.T) {
+	t.Parallel()
+
 	ep := &eventProcessor{
 		cfg:   &config{},
 		store: nil,
@@ -19,7 +21,7 @@ func Test_handler_challenge(t *testing.T) {
 	h := newRouter(&handler{ep})
 
 	body := bytes.NewBufferString(`{"challenge":"challengetoken"}`)
-	req := httptest.NewRequest("POST", "/", body)
+	req := httptest.NewRequest(http.MethodPost, "/", body)
 	req.Header.Add("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -34,8 +36,7 @@ func Test_handler_challenge(t *testing.T) {
 		t.Errorf("Content-Type header should be 'application/json', but %s", contentType)
 	}
 
-	respBody := rec.Body.String()
-	if respBody != `{"challenge":"challengetoken"}` {
+	if respBody := rec.Body.String(); respBody != `{"challenge":"challengetoken"}` {
 		t.Errorf(`response should be '{"challenge":"challengetoken"}', but %s`, respBody)
 	}
 }
@@ -85,6 +86,7 @@ func Test_event_handler(t *testing.T) {
 
 	for name, c := range cases {
 		c := c
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -104,7 +106,7 @@ func Test_event_handler(t *testing.T) {
 			defer flushStore(t)
 
 			body := bytes.NewBufferString(c.requestBody)
-			req := httptest.NewRequest("POST", "/", body)
+			req := httptest.NewRequest(http.MethodPost, "/", body)
 			req.Header.Add("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 

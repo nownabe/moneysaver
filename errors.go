@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -10,10 +11,17 @@ type httpError struct {
 	err    error
 }
 
-func e(status int, msg string, args ...any) error {
+func e(status int, msg string) error {
 	return httpError{
 		status: status,
-		err:    fmt.Errorf(msg, args...),
+		err:    errors.New(msg),
+	}
+}
+
+func wrap(status int, msg string, e error) error {
+	return httpError{
+		status: status,
+		err:    fmt.Errorf(msg, e),
 	}
 }
 

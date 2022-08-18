@@ -21,7 +21,7 @@ func (p *eventProcessor) process(r *http.Request) (string, error) {
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return "", e(http.StatusConflict, "ioutil.ReadAll: %w", err)
+		return "", wrap(http.StatusConflict, "ioutil.ReadAll: %w", err)
 	}
 	defer r.Body.Close()
 
@@ -29,11 +29,11 @@ func (p *eventProcessor) process(r *http.Request) (string, error) {
 
 	msg, err := newSlackMessage(body)
 	if err != nil {
-		return "", e(http.StatusBadRequest, "invalid request body: %w", err)
+		return "", wrap(http.StatusBadRequest, "invalid request body: %w", err)
 	}
 
 	// Challenge request
-	// https://api.slack.com/apis/connections/events-api#the-events-api__subscribing-to-event-types__events-api-request-urls__request-url-configuration--verification
+	// https://api.slack.com/apis/connections/events-api
 	if msg.isChallenge() {
 		return fmt.Sprintf(`{"challenge":"%s"}`, msg.Challenge), nil
 	}
@@ -53,7 +53,7 @@ func (p *eventProcessor) process(r *http.Request) (string, error) {
 	}
 
 	if err := p.store.add(ctx, msg); err != nil {
-		err := e(http.StatusInternalServerError, "p.store.add: %w", err)
+		err := wrap(http.StatusInternalServerError, "p.store.add: %w", err)
 
 		if err := p.replyError(ctx, msg, err); err != nil {
 			logger.Printf("failed to reply error: %v", err)
@@ -64,7 +64,7 @@ func (p *eventProcessor) process(r *http.Request) (string, error) {
 
 	total, err := p.store.total(ctx, msg)
 	if err != nil {
-		err := e(http.StatusInternalServerError, "h.store.total: %w", err)
+		err := wrap(http.StatusInternalServerError, "h.store.total: %w", err)
 
 		if err := p.replyError(ctx, msg, err); err != nil {
 			logger.Printf("failed to reply error: %v", err)
@@ -74,7 +74,7 @@ func (p *eventProcessor) process(r *http.Request) (string, error) {
 	}
 
 	if err := p.replySuccess(ctx, msg, total); err != nil {
-		return "", e(http.StatusInternalServerError, "p.replySuccess: %w", err)
+		return "", wrap(http.StatusInternalServerError, "p.replySuccess: %w", err)
 	}
 
 	return "", nil
