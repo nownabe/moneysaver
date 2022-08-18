@@ -32,10 +32,14 @@ func main() {
 		panic(err)
 	}
 
-	h := &handler{
+	ep := &eventProcessor{
 		cfg:   c,
 		store: s,
 		slack: slack.New(c.SlackBotToken),
+	}
+
+	h := &handler{
+		eventProcessor: ep,
 	}
 
 	r := newRouter(h)

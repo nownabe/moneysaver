@@ -11,18 +11,19 @@ import (
 )
 
 func Test_handler_challenge(t *testing.T) {
-	h := &handler{
+	ep := &eventProcessor{
 		cfg:   &config{},
 		store: nil,
 		slack: newSlackMock(),
 	}
+	h := newRouter(&handler{ep})
 
 	body := bytes.NewBufferString(`{"challenge":"challengetoken"}`)
 	req := httptest.NewRequest("POST", "/", body)
 	req.Header.Add("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	h.handleEvents(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("status code should be 200, but %d", rec.Code)
@@ -67,7 +68,7 @@ func Test_event_handler(t *testing.T) {
 	}{
 		"not number": {
 			`{"token":"valid","event":{"text":"not number","ts":"1.23"}}`,
-			http.StatusNoContent,
+			http.StatusOK,
 			nil,
 		},
 		"invalid token": {
@@ -77,7 +78,7 @@ func Test_event_handler(t *testing.T) {
 		},
 		"no limit": {
 			`{"token":"valid","event":{"channel":"unknown-ch","text":"123","ts":"1.23"}}`,
-			http.StatusNoContent,
+			http.StatusOK,
 			[]*slack.ChatPostMessageReq{},
 		},
 	}
@@ -89,7 +90,7 @@ func Test_event_handler(t *testing.T) {
 
 			mock := newSlackMock()
 
-			h := &handler{
+			ep := &eventProcessor{
 				cfg: &config{
 					Limits:                 map[string]int64{"ch1": 1000},
 					SlackBotToken:          "bottoken",
@@ -98,6 +99,8 @@ func Test_event_handler(t *testing.T) {
 				store: getStore(t),
 				slack: mock,
 			}
+
+			h := newRouter(&handler{ep})
 			defer flushStore(t)
 
 			body := bytes.NewBufferString(c.requestBody)
@@ -105,7 +108,7 @@ func Test_event_handler(t *testing.T) {
 			req.Header.Add("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 
-			h.handleEvents(rec, req)
+			h.ServeHTTP(rec, req)
 
 			if rec.Code != c.code {
 				t.Errorf("status code should be %d, but %d", c.code, rec.Code)
