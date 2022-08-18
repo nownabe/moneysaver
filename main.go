@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-
 	"github.com/nownabe/moneysaver/slack"
 )
 
@@ -55,7 +54,7 @@ func newRouter(h *handler) http.Handler {
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{logger, false}))
+	r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: logger, NoColor: false}))
 	r.Use(middleware.Recoverer)
 
 	r.Use(middleware.Timeout(timeoutSec * time.Second))
