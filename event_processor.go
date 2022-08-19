@@ -3,11 +3,48 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/nownabe/moneysaver/slack"
 )
+
+type slackEvent struct {
+	Channel string `json:"channel"`
+	Text    string `json:"text"`
+	TS      string `json:"ts"`
+}
+
+func (e *slackEvent) timestamp() (time.Time, error) {
+	ts, err := strconv.ParseFloat(e.TS, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("strconv.ParseFloat: %w", err)
+	}
+
+	return time.Unix(int64(ts), 0), nil
+}
+
+func (e *slackEvent) expenditureAmount() (int64, bool) {
+	a, err := strconv.ParseInt(e.Text, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return a, true
+}
+
+// https://api.slack.com/events-api#the-events-api__receiving-events__callback-field-overview
+type slackMessage struct {
+	Token     string      `json:"token"`
+	Challenge string      `json:"challenge"`
+	TeamID    string      `json:"team_id"`
+	Event     *slackEvent `json:"event"`
+}
+
+func (msg *slackMessage) isChallenge() bool {
+	return msg.Challenge != ""
+}
 
 type eventProcessor struct {
 	cfg   *config
@@ -16,22 +53,7 @@ type eventProcessor struct {
 }
 
 // process returns response body and error.
-func (p *eventProcessor) process(r *http.Request) (string, error) {
-	ctx := r.Context()
-
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return "", wrap(http.StatusConflict, "ioutil.ReadAll: %w", err)
-	}
-	defer r.Body.Close()
-
-	logger.Printf("Event JSON: %s", body)
-
-	msg, err := newSlackMessage(body)
-	if err != nil {
-		return "", wrap(http.StatusBadRequest, "invalid request body: %w", err)
-	}
-
+func (p *eventProcessor) process(ctx context.Context, msg *slackMessage) (string, error) {
 	// Challenge request
 	// https://api.slack.com/apis/connections/events-api
 	if msg.isChallenge() {
@@ -42,47 +64,64 @@ func (p *eventProcessor) process(r *http.Request) (string, error) {
 		return "", e(http.StatusUnauthorized, "invalid token")
 	}
 
-	// Messages not to be processed
-	if !msg.ok {
-		return "", nil
-	}
-
-	// Messages in channels not to be processed
-	if _, ok := p.cfg.getLimit(msg.Event.Channel); !ok {
-		return "", nil
-	}
-
-	if err := p.store.add(ctx, msg); err != nil {
-		err := wrap(http.StatusInternalServerError, "p.store.add: %w", err)
-
-		if err := p.replyError(ctx, msg, err); err != nil {
-			logger.Printf("failed to reply error: %v", err)
-		}
-
-		return "", err
-	}
-
-	total, err := p.store.total(ctx, msg)
-	if err != nil {
-		err := wrap(http.StatusInternalServerError, "h.store.total: %w", err)
-
-		if err := p.replyError(ctx, msg, err); err != nil {
-			logger.Printf("failed to reply error: %v", err)
-		}
-
-		return "", err
-	}
-
-	if err := p.replySuccess(ctx, msg, total); err != nil {
-		return "", wrap(http.StatusInternalServerError, "p.replySuccess: %w", err)
+	if err := p.processExpenditure(ctx, msg.Event); err != nil {
+		return "", wrap(http.StatusInternalServerError, "p.processExpenditure: %w", err)
 	}
 
 	return "", nil
 }
 
-func (p *eventProcessor) replyError(ctx context.Context, msg *slackMessage, err error) error {
+func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackEvent) error {
+	// Messages in channels not to be processed
+	limit, ok := p.cfg.getLimit(ev.Channel)
+	if !ok {
+		return nil
+	}
+
+	// Messages not to be processed
+	exAmount, ok := ev.expenditureAmount()
+	if !ok {
+		return nil
+	}
+
+	ts, err := ev.timestamp()
+	if err != nil {
+		return fmt.Errorf("ev.timestamp: %w", err)
+	}
+
+	ex := &expenditure{ev.TS, exAmount}
+
+	if err := p.store.add(ctx, ev.Channel, ts, ex); err != nil {
+		err := fmt.Errorf("p.store.add: %w", err)
+
+		if err := p.replyError(ctx, ev.Channel, err); err != nil {
+			logger.Printf("failed to reply error: %v", err)
+		}
+
+		return err
+	}
+
+	total, err := p.store.total(ctx, ev.Channel, ts)
+	if err != nil {
+		err := fmt.Errorf("p.store.total: %w", err)
+
+		if err := p.replyError(ctx, ev.Channel, err); err != nil {
+			logger.Printf("failed to reply error: %v", err)
+		}
+
+		return err
+	}
+
+	if err := p.replySuccess(ctx, ev.Channel, limit, total, ex); err != nil {
+		return fmt.Errorf("p.replySuccess: %w", err)
+	}
+
+	return nil
+}
+
+func (p *eventProcessor) replyError(ctx context.Context, channel string, err error) error {
 	r := &slack.ChatPostMessageReq{
-		Channel:   msg.Event.Channel,
+		Channel:   channel,
 		Text:      "```\n" + err.Error() + "\n```",
 		Username:  "MoneySaver",
 		IconEmoji: ":money_with_wings:",
@@ -95,14 +134,9 @@ func (p *eventProcessor) replyError(ctx context.Context, msg *slackMessage, err 
 	return nil
 }
 
-func (p *eventProcessor) replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
-	limit, ok := p.cfg.getLimit(msg.Event.Channel)
-	if !ok {
-		return fmt.Errorf("limit is not configured: %s", msg.Event.Channel)
-	}
-
+func (p *eventProcessor) replySuccess(ctx context.Context, channel string, limit, total int64, ex *expenditure) error {
 	r := &slack.ChatPostMessageReq{
-		Channel:   msg.Event.Channel,
+		Channel:   channel,
 		Text:      "カード利用を登録しました",
 		Username:  "MoneySaver",
 		IconEmoji: ":money_with_wings:",
@@ -111,7 +145,7 @@ func (p *eventProcessor) replySuccess(ctx context.Context, msg *slackMessage, to
 				Fields: []*slack.AttachmentField{
 					{
 						Title: "利用額",
-						Value: humanize(msg.amount),
+						Value: humanize(ex.amount),
 						Short: true,
 					},
 					{

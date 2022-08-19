@@ -30,24 +30,25 @@ func newStoreClient(ctx context.Context, projectID string) (*storeClient, error)
 	return &storeClient{firestore: c}, nil
 }
 
-func (s *storeClient) collection(msg *slackMessage) *firestore.CollectionRef {
-	return s.firestore.Collection(collectionName).Doc(msg.Event.Channel).Collection(msg.month())
+func (s *storeClient) collection(channel string, ts time.Time) *firestore.CollectionRef {
+	month := ts.Format("2006-01")
+	return s.firestore.Collection(collectionName).Doc(channel).Collection(month)
 }
 
-func (s *storeClient) add(ctx context.Context, msg *slackMessage) error {
-	docRef := s.collection(msg).Doc(msg.Event.TS)
-	if _, err := docRef.Set(ctx, &record{msg.timestamp, msg.amount}); err != nil {
+func (s *storeClient) add(ctx context.Context, channel string, ts time.Time, ex *expenditure) error {
+	docRef := s.collection(channel, ts).Doc(ex.ts)
+	if _, err := docRef.Set(ctx, &record{ts, ex.amount}); err != nil {
 		return xerrors.Errorf("docRef.Set: %w", err)
 	}
 
 	return nil
 }
 
-func (s *storeClient) total(ctx context.Context, msg *slackMessage) (int64, error) {
+func (s *storeClient) total(ctx context.Context, channel string, ts time.Time) (int64, error) {
 	var r record
 	var total int64
 
-	docsIter := s.collection(msg).Documents(ctx)
+	docsIter := s.collection(channel, ts).Documents(ctx)
 	for {
 		doc, err := docsIter.Next()
 		if err == iterator.Done {
