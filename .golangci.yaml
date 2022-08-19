@@ -1,5 +1,4 @@
-linters-settings:
-  testpackage:
+linters-settings: {}
 
 linters:
   disable-all: true
@@ -30,7 +29,7 @@ linters:
     - forcetypeassert
     - funlen
     - gci
-    - gochecknoglobals
+    # - gochecknoglobals # TODO: Uncomment after logger is organized
     - gochecknoinits
     - gocognit
     - goconst
@@ -44,7 +43,7 @@ linters:
     - goheader
     - goimports
     - golint
-    - gomnd
+    # - gomnd
     - gomoddirectives
     - gomodguard
     - goprintffuncname
@@ -83,7 +82,7 @@ linters:
     - staticcheck
     - structcheck
     - stylecheck
-    - tagliatelle
+    # - tagliatelle
     - tenv
     # - testpackage
     - thelper
