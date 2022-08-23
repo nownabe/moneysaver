@@ -22,14 +22,6 @@ type storeClient struct {
 	firestore *firestore.Client
 }
 
-func newStoreClient(ctx context.Context, projectID string) (*storeClient, error) {
-	c, err := firestore.NewClient(ctx, projectID)
-	if err != nil {
-		return nil, xerrors.Errorf("failed to build firestore client: %w", err)
-	}
-	return &storeClient{firestore: c}, nil
-}
-
 func (s *storeClient) collection(channel string, ts time.Time) *firestore.CollectionRef {
 	month := ts.Format("2006-01")
 	return s.firestore.Collection(collectionName).Doc(channel).Collection(month)

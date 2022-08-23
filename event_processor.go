@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -16,6 +17,15 @@ type slackEvent struct {
 	TS      string `json:"ts"`
 }
 
+func (e *slackEvent) expenditure() (*expenditure, bool) {
+	a, err := strconv.ParseInt(e.Text, 10, 64)
+	if err != nil {
+		return nil, false
+	}
+
+	return &expenditure{e.TS, a}, true
+}
+
 func (e *slackEvent) timestamp() (time.Time, error) {
 	ts, err := strconv.ParseFloat(e.TS, 64)
 	if err != nil {
@@ -23,15 +33,6 @@ func (e *slackEvent) timestamp() (time.Time, error) {
 	}
 
 	return time.Unix(int64(ts), 0), nil
-}
-
-func (e *slackEvent) expenditureAmount() (int64, bool) {
-	a, err := strconv.ParseInt(e.Text, 10, 64)
-	if err != nil {
-		return 0, false
-	}
-
-	return a, true
 }
 
 // https://api.slack.com/events-api#the-events-api__receiving-events__callback-field-overview
@@ -47,9 +48,10 @@ func (msg *slackMessage) isChallenge() bool {
 }
 
 type eventProcessor struct {
-	cfg   *config
-	store *storeClient
-	slack slack.Client
+	cfg         *config
+	store       *storeClient
+	slack       slack.Client
+	channelRepo *channelRepo
 }
 
 // process returns response body and error.
@@ -72,15 +74,18 @@ func (p *eventProcessor) process(ctx context.Context, msg *slackMessage) (string
 }
 
 func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackEvent) error {
-	// Messages in channels not to be processed
-	limit, ok := p.cfg.getLimit(ev.Channel)
-	if !ok {
-		return nil
+	ch, err := p.channelRepo.findByID(ctx, ev.Channel)
+	if err != nil {
+		if errors.Is(err, errNotFound) {
+			return nil
+		}
+
+		return fmt.Errorf("p.channelRepo.findByID: %w", err)
 	}
 
-	// Messages not to be processed
-	exAmount, ok := ev.expenditureAmount()
+	ex, ok := ev.expenditure()
 	if !ok {
+		// Messages not to be processed
 		return nil
 	}
 
@@ -88,8 +93,6 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackEvent)
 	if err != nil {
 		return fmt.Errorf("ev.timestamp: %w", err)
 	}
-
-	ex := &expenditure{ev.TS, exAmount}
 
 	if err := p.store.add(ctx, ev.Channel, ts, ex); err != nil {
 		err := fmt.Errorf("p.store.add: %w", err)
@@ -112,7 +115,7 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackEvent)
 		return err
 	}
 
-	if err := p.replySuccess(ctx, ev.Channel, limit, total, ex); err != nil {
+	if err := p.replySuccess(ctx, ev.Channel, ch.Budget, total, ex); err != nil {
 		return fmt.Errorf("p.replySuccess: %w", err)
 	}
 

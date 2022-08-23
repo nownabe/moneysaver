@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nownabe/moneysaver/slack"
@@ -26,19 +27,28 @@ func main() {
 		panic(err)
 	}
 
-	s, err := newStoreClient(context.Background(), c.ProjectID)
+	ctx := context.Background()
+
+	fs, err := firestore.NewClient(ctx, c.ProjectID)
 	if err != nil {
 		panic(err)
 	}
 
 	ep := &eventProcessor{
-		cfg:   c,
-		store: s,
-		slack: slack.New(c.SlackBotToken),
+		cfg:         c,
+		store:       &storeClient{fs},
+		slack:       slack.New(c.SlackBotToken),
+		channelRepo: &channelRepo{fs},
+	}
+
+	cp := &commandProcessor{
+		channelRepo: &channelRepo{fs},
 	}
 
 	h := &handler{
-		eventProcessor: ep,
+		signingSecret:    c.SlackSigningSecret,
+		eventProcessor:   ep,
+		commandProcessor: cp,
 	}
 
 	r := newRouter(h)
@@ -60,6 +70,7 @@ func newRouter(h *handler) http.Handler {
 	r.Use(middleware.Timeout(timeoutSec * time.Second))
 
 	r.Post("/", h.handleEvents)
+	r.Post("/commands", h.handleCommands)
 
 	return r
 }

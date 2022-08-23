@@ -18,7 +18,7 @@ func Test_handler_challenge(t *testing.T) {
 		store: nil,
 		slack: newSlackMock(),
 	}
-	h := newRouter(&handler{ep})
+	h := newRouter(&handler{"", ep, nil})
 
 	body := bytes.NewBufferString(`{"challenge":"challengetoken"}`)
 	req := httptest.NewRequest(http.MethodPost, "/", body)
@@ -68,12 +68,12 @@ func Test_event_handler(t *testing.T) {
 		reqs        []*slack.ChatPostMessageReq
 	}{
 		"not number": {
-			`{"token":"valid","event":{"text":"not number","ts":"1.23"}}`,
+			`{"token":"valid","event":{"channel":"ch1","text":"not number","ts":"1.23"}}`,
 			http.StatusOK,
 			nil,
 		},
 		"invalid token": {
-			`{"token":"invalid","event":{"text":"123","ts":"1.23"}}`,
+			`{"token":"invalid","event":{"channel":"ch2","text":"123","ts":"1.23"}}`,
 			http.StatusUnauthorized,
 			[]*slack.ChatPostMessageReq{},
 		},
@@ -92,17 +92,19 @@ func Test_event_handler(t *testing.T) {
 
 			mock := newSlackMock()
 
+			fs := getFirestoreClient(t)
 			ep := &eventProcessor{
 				cfg: &config{
 					Limits:                 map[string]int64{"ch1": 1000},
 					SlackBotToken:          "bottoken",
 					SlackVerificationToken: "valid",
 				},
-				store: getStore(t),
-				slack: mock,
+				store:       &storeClient{fs},
+				slack:       mock,
+				channelRepo: &channelRepo{fs},
 			}
 
-			h := newRouter(&handler{ep})
+			h := newRouter(&handler{"", ep, nil})
 			defer flushStore(t)
 
 			body := bytes.NewBufferString(c.requestBody)
