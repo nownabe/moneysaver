@@ -1,157 +1,111 @@
 package main
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 
-	"github.com/nownabe/moneysaver/slack"
-	"golang.org/x/xerrors"
+	"github.com/slack-go/slack"
 )
 
 type handler struct {
-	cfg   *config
-	store *storeClient
-	slack slack.Client
+	signingSecret    string
+	eventProcessor   *eventProcessor
+	commandProcessor *commandProcessor
 }
 
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	if r.Header.Get("Content-Type") != "application/json" {
+	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
+		logger.Printf("Unsupported content type: %s", contentType)
 		w.WriteHeader(http.StatusUnsupportedMediaType)
+
 		return
 	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("failed to read request body: %v", err)
+		logger.Printf("ioutil.ReadAll: %v", err)
 		w.WriteHeader(http.StatusConflict)
+
 		return
 	}
 	defer r.Body.Close()
 
-	log.Printf("%s", body)
+	logger.Printf("%s", body)
 
-	msg, err := newSlackMessage(body)
-	if err != nil {
-		log.Printf("unexpexted request body: %v", err)
+	var msg slackMessage
+
+	if err := json.Unmarshal(body, &msg); err != nil {
+		logger.Printf("json.Unmarshal: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
+
 		return
 	}
 
-	// Challenge request
-	// https://api.slack.com/apis/connections/events-api#the-events-api__subscribing-to-event-types__events-api-request-urls__request-url-configuration--verification
-	if msg.isChallenge() {
-		w.WriteHeader(http.StatusOK)
-		w.Header().Add("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"challenge":"%s"}`, msg.Challenge)
-		return
-	}
-
-	if msg.Token != h.cfg.SlackVerificationToken {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Messages not to be processed
-	if !msg.ok {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	// Messages in channels not to be processed
-	if _, ok := h.cfg.getLimit(msg.Event.Channel); !ok {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	if err := h.store.add(ctx, msg); err != nil {
-		e := xerrors.Errorf("failed to add record: %w", err)
-		log.Printf("%v", e)
-		if err := h.replyError(ctx, msg, e); err != nil {
-			log.Printf("failed to reply error: %v", err)
-		}
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	total, err := h.store.total(ctx, msg)
+	resBody, err := h.eventProcessor.process(ctx, &msg)
 	if err != nil {
-		e := xerrors.Errorf("failed to aggregate: %w", err)
-		log.Printf("%v", e)
-		if err := h.replyError(ctx, msg, e); err != nil {
-			log.Printf("failed to reply error: %v", err)
-		}
-		w.WriteHeader(http.StatusInternalServerError)
+		logger.Printf("h.eventProcessor.process: %v", err)
+		writeErrorHeader(w, err)
+
 		return
 	}
 
-	if err := h.replySuccess(ctx, msg, total); err != nil {
-		log.Printf("failed to reply: %v", err)
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, resBody)
+}
+
+func (h *handler) handleCommands(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	verifier, err := slack.NewSecretsVerifier(r.Header, h.signingSecret)
+	if err != nil {
+		logger.Printf("slack.NewSecretsVerifier: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
+
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
-}
+	r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
 
-func (h *handler) replySuccess(ctx context.Context, msg *slackMessage, total int64) error {
-	limit, ok := h.cfg.getLimit(msg.Event.Channel)
-	if !ok {
-		return xerrors.Errorf("limit is not configured: %s", msg.Event.Channel)
+	s, err := slack.SlashCommandParse(r)
+	if err != nil {
+		logger.Printf("slack.SlashCommandParse: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+
+		return
 	}
 
-	r := &slack.ChatPostMessageReq{
-		Channel:   msg.Event.Channel,
-		Text:      "カード利用を登録しました",
-		Username:  "MoneySaver",
-		IconEmoji: ":money_with_wings:",
-		Attachments: []*slack.Attachment{
-			{
-				Fields: []*slack.AttachmentField{
-					{
-						Title: "利用額",
-						Value: humanize(msg.amount),
-						Short: true,
-					},
-					{
-						Title: "今月の利用可能残額",
-						Value: humanize(limit - total),
-						Short: true,
-					},
-					{
-						Title: "今月の合計利用額",
-						Value: humanize(total),
-						Short: true,
-					},
-					{
-						Title: "今月の設定上限額",
-						Value: humanize(limit),
-						Short: true,
-					},
-				},
-			},
-		},
+	if err = verifier.Ensure(); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+
+		return
 	}
 
-	return h.slack.ChatPostMessage(ctx, r)
-}
+	resp, err := h.commandProcessor.process(ctx, s)
+	if err != nil {
+		logger.Printf("h.commandProcessor.process: %v", err)
+		writeErrorHeader(w, err)
 
-func (h *handler) replyError(ctx context.Context, msg *slackMessage, err error) error {
-	r := &slack.ChatPostMessageReq{
-		Channel:   msg.Event.Channel,
-		Text:      "```\n" + err.Error() + "\n```",
-		Username:  "MoneySaver",
-		IconEmoji: ":money_with_wings:",
+		return
 	}
 
-	return h.slack.ChatPostMessage(ctx, r)
+	b, err := json.Marshal(resp)
+	if err != nil {
+		logger.Printf("json.Marshal: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(b); err != nil {
+		logger.Printf("w.Write: %v", err)
+	}
 }

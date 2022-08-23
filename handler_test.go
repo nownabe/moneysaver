@@ -11,14 +11,17 @@ import (
 )
 
 func Test_handler_challenge(t *testing.T) {
-	h := &handler{
+	t.Parallel()
+
+	ep := &eventProcessor{
 		cfg:   &config{},
 		store: nil,
 		slack: newSlackMock(),
 	}
+	h := newRouter(&handler{"", ep, nil})
 
 	body := bytes.NewBufferString(`{"challenge":"challengetoken"}`)
-	req := httptest.NewRequest("POST", "/", body)
+	req := httptest.NewRequest(http.MethodPost, "/", body)
 	req.Header.Add("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -33,8 +36,7 @@ func Test_handler_challenge(t *testing.T) {
 		t.Errorf("Content-Type header should be 'application/json', but %s", contentType)
 	}
 
-	respBody := rec.Body.String()
-	if respBody != `{"challenge":"challengetoken"}` {
+	if respBody := rec.Body.String(); respBody != `{"challenge":"challengetoken"}` {
 		t.Errorf(`response should be '{"challenge":"challengetoken"}', but %s`, respBody)
 	}
 }
@@ -66,42 +68,47 @@ func Test_event_handler(t *testing.T) {
 		reqs        []*slack.ChatPostMessageReq
 	}{
 		"not number": {
-			`{"token":"valid","event":{"text":"not number","ts":"1.23"}}`,
-			http.StatusNoContent,
+			`{"token":"valid","event":{"channel":"ch1","text":"not number","ts":"1.23"}}`,
+			http.StatusOK,
 			nil,
 		},
 		"invalid token": {
-			`{"token":"invalid","event":{"text":"123","ts":"1.23"}}`,
+			`{"token":"invalid","event":{"channel":"ch2","text":"123","ts":"1.23"}}`,
 			http.StatusUnauthorized,
 			[]*slack.ChatPostMessageReq{},
 		},
 		"no limit": {
 			`{"token":"valid","event":{"channel":"unknown-ch","text":"123","ts":"1.23"}}`,
-			http.StatusNoContent,
+			http.StatusOK,
 			[]*slack.ChatPostMessageReq{},
 		},
 	}
 
 	for name, c := range cases {
 		c := c
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			mock := newSlackMock()
 
-			h := &handler{
+			fs := getFirestoreClient(t)
+			ep := &eventProcessor{
 				cfg: &config{
 					Limits:                 map[string]int64{"ch1": 1000},
 					SlackBotToken:          "bottoken",
 					SlackVerificationToken: "valid",
 				},
-				store: getStore(t),
-				slack: mock,
+				store:       &storeClient{fs},
+				slack:       mock,
+				channelRepo: &channelRepo{fs},
 			}
+
+			h := newRouter(&handler{"", ep, nil})
 			defer flushStore(t)
 
 			body := bytes.NewBufferString(c.requestBody)
-			req := httptest.NewRequest("POST", "/", body)
+			req := httptest.NewRequest(http.MethodPost, "/", body)
 			req.Header.Add("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 

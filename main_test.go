@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"cloud.google.com/go/firestore"
 )
 
 const (
@@ -31,15 +33,15 @@ func test2Project(t *testing.T) string {
 	return strings.ToLower(name)
 }
 
-func getStore(t *testing.T) *storeClient {
+func getFirestoreClient(t *testing.T) *firestore.Client {
 	t.Helper()
 
-	s, err := newStoreClient(context.Background(), test2Project(t))
+	fs, err := firestore.NewClient(context.Background(), test2Project(t))
 	if err != nil {
 		panic(err)
 	}
 
-	return s
+	return fs
 }
 
 func flushStore(t *testing.T) {
