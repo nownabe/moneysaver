@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 
@@ -11,7 +10,6 @@ import (
 )
 
 type handler struct {
-	signingSecret    string
 	eventProcessor   *eventProcessor
 	commandProcessor *commandProcessor
 }
@@ -62,26 +60,10 @@ func (h *handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 func (h *handler) handleCommands(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	verifier, err := slack.NewSecretsVerifier(r.Header, h.signingSecret)
-	if err != nil {
-		logger.Printf("slack.NewSecretsVerifier: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-
-		return
-	}
-
-	r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
-
 	s, err := slack.SlashCommandParse(r)
 	if err != nil {
 		logger.Printf("slack.SlashCommandParse: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-
-		return
-	}
-
-	if err = verifier.Ensure(); err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
 
 		return
 	}

@@ -46,12 +46,11 @@ func main() {
 	}
 
 	h := &handler{
-		signingSecret:    c.SlackSigningSecret,
 		eventProcessor:   ep,
 		commandProcessor: cp,
 	}
 
-	r := newRouter(h)
+	r := newRouter(h, c.SlackSigningSecret)
 
 	// Start server
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -59,15 +58,15 @@ func main() {
 	}
 }
 
-func newRouter(h *handler) http.Handler {
+func newRouter(h *handler, signingSecret string) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: logger, NoColor: false}))
 	r.Use(middleware.Recoverer)
-
 	r.Use(middleware.Timeout(timeoutSec * time.Second))
+	r.Use(slackVerifier(signingSecret))
 
 	r.Post("/", h.handleEvents)
 	r.Post("/commands", h.handleCommands)

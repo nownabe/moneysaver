@@ -62,10 +62,6 @@ func (p *eventProcessor) process(ctx context.Context, msg *slackMessage) (string
 		return fmt.Sprintf(`{"challenge":"%s"}`, msg.Challenge), nil
 	}
 
-	if msg.Token != p.cfg.SlackVerificationToken {
-		return "", e(http.StatusUnauthorized, "invalid token")
-	}
-
 	if err := p.processExpenditure(ctx, msg.Event); err != nil {
 		return "", wrap(http.StatusInternalServerError, "p.processExpenditure: %w", err)
 	}
