@@ -14,7 +14,6 @@ func Test_handler_challenge(t *testing.T) {
 	t.Parallel()
 
 	ep := &eventProcessor{
-		cfg:   &config{},
 		store: nil,
 		slack: newSlackMock(),
 	}
@@ -23,6 +22,7 @@ func Test_handler_challenge(t *testing.T) {
 	body := bytes.NewBufferString(`{"challenge":"challengetoken"}`)
 	req := httptest.NewRequest(http.MethodPost, "/", body)
 	req.Header.Add("Content-Type", "application/json")
+
 	rec := httptest.NewRecorder()
 
 	h.handleEvents(rec, req)
@@ -89,10 +89,6 @@ func Test_event_handler(t *testing.T) {
 
 			fs := getFirestoreClient(t)
 			ep := &eventProcessor{
-				cfg: &config{
-					Limits:        map[string]int64{"ch1": 1000},
-					SlackBotToken: "bottoken",
-				},
 				store:       &storeClient{fs},
 				slack:       mock,
 				channelRepo: &channelRepo{fs},
