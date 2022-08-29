@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/slack-go/slack"
+	"github.com/slack-go/slack/slackevents"
 )
 
 type handler struct {
@@ -35,26 +35,42 @@ func (h *handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	logger.Printf("%s", body)
 
-	var msg slackMessage
-
-	if err := json.Unmarshal(body, &msg); err != nil {
-		logger.Printf("json.Unmarshal: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
+	ev, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
+	if err != nil {
+		logger.Printf("slackevents.ParseEvent: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
 
 		return
 	}
 
-	resBody, err := h.eventProcessor.process(ctx, &msg)
-	if err != nil {
+	if ev.Type == slackevents.URLVerification {
+		h.handleChallenge(w, body)
+
+		return
+	}
+
+	if err := h.eventProcessor.process(ctx, ev); err != nil {
 		logger.Printf("h.eventProcessor.process: %v", err)
 		writeErrorHeader(w, err)
 
 		return
 	}
 
-	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, resBody)
+}
+
+func (h *handler) handleChallenge(w http.ResponseWriter, body []byte) {
+	var r *slackevents.ChallengeResponse
+	if err := json.Unmarshal(body, &r); err != nil {
+		logger.Printf("json.Unmarshal: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(r.Challenge)); err != nil {
+			logger.Printf("w.Write: %v", err)
+		}
+	}
 }
 
 func (h *handler) handleCommands(w http.ResponseWriter, r *http.Request) {
