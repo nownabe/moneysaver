@@ -22,9 +22,9 @@ func ts2time(ts string) (time.Time, error) {
 }
 
 type eventProcessor struct {
-	store       *storeClient
-	slack       slack.Client
-	channelRepo *channelRepo
+	slack           slack.Client
+	channelRepo     *channelRepo
+	expenditureRepo *expenditureRepo
 }
 
 // process returns response body and error.
@@ -53,19 +53,15 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackevents
 		return fmt.Errorf("p.channelRepo.findByID: %w", err)
 	}
 
-	ex, ok := newExpenditure(ev)
-	if !ok {
-		// Messages not to be processed
+	ex, err := newExpenditure(ev)
+	if errors.Is(err, errNotExpenditureMessage) {
 		return nil
+	} else if err != nil {
+		return fmt.Errorf("newExpenditure: %w", err)
 	}
 
-	t, err := ts2time(ex.ts)
-	if err != nil {
-		return fmt.Errorf("ev.timestamp: %w", err)
-	}
-
-	if err := p.store.add(ctx, ev.Channel, t, ex); err != nil {
-		err := fmt.Errorf("p.store.add: %w", err)
+	if err := p.expenditureRepo.add(ctx, ex); err != nil {
+		err := fmt.Errorf("p.expenditureRepo.add: %w", err)
 
 		if err := p.replyError(ctx, ev.Channel, err); err != nil {
 			logger.Printf("failed to reply error: %v", err)
@@ -74,7 +70,7 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackevents
 		return err
 	}
 
-	total, err := p.store.total(ctx, ev.Channel, t)
+	total, err := p.expenditureRepo.total(ctx, ex)
 	if err != nil {
 		err := fmt.Errorf("p.store.total: %w", err)
 
@@ -118,7 +114,7 @@ func (p *eventProcessor) replySuccess(ctx context.Context, channel string, limit
 				Fields: []*slack.AttachmentField{
 					{
 						Title: "利用額",
-						Value: humanize(ex.amount),
+						Value: humanize(ex.Amount),
 						Short: true,
 					},
 					{

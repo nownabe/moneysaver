@@ -35,9 +35,9 @@ func main() {
 	}
 
 	ep := &eventProcessor{
-		store:       &storeClient{fs},
-		slack:       slack.New(c.SlackBotToken),
-		channelRepo: &channelRepo{fs},
+		slack:           slack.New(c.SlackBotToken),
+		channelRepo:     &channelRepo{fs},
+		expenditureRepo: &expenditureRepo{fs},
 	}
 
 	cp := &commandProcessor{
