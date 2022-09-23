@@ -14,7 +14,6 @@ func Test_handler_challenge(t *testing.T) {
 	t.Parallel()
 
 	ep := &eventProcessor{
-		store: nil,
 		slack: newSlackMock(),
 	}
 	h := &handler{ep, nil}
@@ -89,9 +88,9 @@ func Test_event_handler(t *testing.T) {
 
 			fs := getFirestoreClient(t)
 			ep := &eventProcessor{
-				store:       &storeClient{fs},
-				slack:       mock,
-				channelRepo: &channelRepo{fs},
+				slack:           mock,
+				channelRepo:     &channelRepo{fs},
+				expenditureRepo: &expenditureRepo{fs},
 			}
 
 			h := &handler{ep, nil}

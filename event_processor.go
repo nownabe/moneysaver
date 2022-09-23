@@ -22,9 +22,9 @@ func ts2time(ts string) (time.Time, error) {
 }
 
 type eventProcessor struct {
-	store       *storeClient
-	slack       slack.Client
-	channelRepo *channelRepo
+	slack           slack.Client
+	channelRepo     *channelRepo
+	expenditureRepo *expenditureRepo
 }
 
 // process returns response body and error.
@@ -35,8 +35,23 @@ func (p *eventProcessor) process(ctx context.Context, ev slackevents.EventsAPIEv
 
 	switch ev := ev.InnerEvent.Data.(type) {
 	case *slackevents.MessageEvent:
+		if err := p.processMessageEvent(ctx, ev); err != nil {
+			return wrap(http.StatusInternalServerError, "p.processMessageEvent: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (p *eventProcessor) processMessageEvent(ctx context.Context, ev *slackevents.MessageEvent) error {
+	switch ev.SubType {
+	case "":
 		if err := p.processExpenditure(ctx, ev); err != nil {
-			return wrap(http.StatusInternalServerError, "p.processExpenditure: %w", err)
+			return fmt.Errorf("p.processExpenditure: %w", err)
+		}
+	case "message_deleted":
+		if err := p.processMessageDeletedEvent(ctx, ev); err != nil {
+			return fmt.Errorf("p.processMessageDeletedEvent: %w", err)
 		}
 	}
 
@@ -53,19 +68,15 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackevents
 		return fmt.Errorf("p.channelRepo.findByID: %w", err)
 	}
 
-	ex, ok := newExpenditure(ev)
-	if !ok {
-		// Messages not to be processed
+	ex, err := newExpenditure(ev)
+	if errors.Is(err, errNotExpenditureMessage) {
 		return nil
+	} else if err != nil {
+		return fmt.Errorf("newExpenditure: %w", err)
 	}
 
-	t, err := ts2time(ex.ts)
-	if err != nil {
-		return fmt.Errorf("ev.timestamp: %w", err)
-	}
-
-	if err := p.store.add(ctx, ev.Channel, t, ex); err != nil {
-		err := fmt.Errorf("p.store.add: %w", err)
+	if err := p.expenditureRepo.add(ctx, ex); err != nil {
+		err := fmt.Errorf("p.expenditureRepo.add: %w", err)
 
 		if err := p.replyError(ctx, ev.Channel, err); err != nil {
 			logger.Printf("failed to reply error: %v", err)
@@ -74,7 +85,7 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackevents
 		return err
 	}
 
-	total, err := p.store.total(ctx, ev.Channel, t)
+	total, err := p.expenditureRepo.total(ctx, ex)
 	if err != nil {
 		err := fmt.Errorf("p.store.total: %w", err)
 
@@ -85,7 +96,7 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackevents
 		return err
 	}
 
-	if err := p.replySuccess(ctx, ev.Channel, ch.Budget, total, ex); err != nil {
+	if err := p.replySuccess(ctx, ev.Channel, ch.Budget, total, ex, false); err != nil {
 		return fmt.Errorf("p.replySuccess: %w", err)
 	}
 
@@ -107,18 +118,28 @@ func (p *eventProcessor) replyError(ctx context.Context, channel string, err err
 	return nil
 }
 
-func (p *eventProcessor) replySuccess(ctx context.Context, channel string, limit, total int64, ex *expenditure) error {
+func (p *eventProcessor) replySuccess(ctx context.Context, channel string, limit, total int64, ex *expenditure, deleted bool) error {
+	var text, usage string
+
+	if deleted {
+		text = "🗑 カード利用を削除しました。"
+		usage = "削除額"
+	} else {
+		text = "💸 カード利用を登録しました。"
+		usage = "利用額"
+	}
+
 	r := &slack.ChatPostMessageReq{
 		Channel:   channel,
-		Text:      "カード利用を登録しました",
+		Text:      text,
 		Username:  "MoneySaver",
 		IconEmoji: ":money_with_wings:",
 		Attachments: []*slack.Attachment{
 			{
 				Fields: []*slack.AttachmentField{
 					{
-						Title: "利用額",
-						Value: humanize(ex.amount),
+						Title: usage,
+						Value: humanize(ex.Amount),
 						Short: true,
 					},
 					{
@@ -143,6 +164,43 @@ func (p *eventProcessor) replySuccess(ctx context.Context, channel string, limit
 
 	if err := p.slack.ChatPostMessage(ctx, r); err != nil {
 		return fmt.Errorf("p.slack.ChatPostMessage: %w", err)
+	}
+
+	return nil
+}
+
+func (p *eventProcessor) processMessageDeletedEvent(ctx context.Context, ev *slackevents.MessageEvent) error {
+	ch, err := p.channelRepo.findByID(ctx, ev.Channel)
+	if errors.Is(err, errNotFound) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("p.channelRepo.findByID: %w", err)
+	}
+
+	ex, err := newExpenditureFromPreviousMessage(ev)
+	if errors.Is(err, errNotExpenditureMessage) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("newExpenditure: %w", err)
+	}
+
+	if err := p.expenditureRepo.delete(ctx, ex); err != nil {
+		return fmt.Errorf("p.expenditureRepo.delete: %w", err)
+	}
+
+	total, err := p.expenditureRepo.total(ctx, ex)
+	if err != nil {
+		err := fmt.Errorf("p.store.total: %w", err)
+
+		if err := p.replyError(ctx, ev.Channel, err); err != nil {
+			logger.Printf("failed to reply error: %v", err)
+		}
+
+		return err
+	}
+
+	if err := p.replySuccess(ctx, ev.Channel, ch.Budget, total, ex, true); err != nil {
+		return fmt.Errorf("p.replySuccess: %w", err)
 	}
 
 	return nil
