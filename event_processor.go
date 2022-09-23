@@ -9,67 +9,41 @@ import (
 	"time"
 
 	"github.com/nownabe/moneysaver/slack"
+	"github.com/slack-go/slack/slackevents"
 )
 
-type slackEvent struct {
-	Channel string `json:"channel"`
-	Text    string `json:"text"`
-	TS      string `json:"ts"`
-}
-
-func (e *slackEvent) expenditure() (*expenditure, bool) {
-	a, err := strconv.ParseInt(e.Text, 10, 64)
-	if err != nil {
-		return nil, false
-	}
-
-	return &expenditure{e.TS, a}, true
-}
-
-func (e *slackEvent) timestamp() (time.Time, error) {
-	ts, err := strconv.ParseFloat(e.TS, 64)
+func ts2time(ts string) (time.Time, error) {
+	t, err := strconv.ParseFloat(ts, 64)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("strconv.ParseFloat: %w", err)
 	}
 
-	return time.Unix(int64(ts), 0), nil
-}
-
-// https://api.slack.com/events-api#the-events-api__receiving-events__callback-field-overview
-type slackMessage struct {
-	Token     string      `json:"token"`
-	Challenge string      `json:"challenge"`
-	TeamID    string      `json:"team_id"`
-	Event     *slackEvent `json:"event"`
-}
-
-func (msg *slackMessage) isChallenge() bool {
-	return msg.Challenge != ""
+	return time.Unix(int64(t), 0), nil
 }
 
 type eventProcessor struct {
-	cfg         *config
 	store       *storeClient
 	slack       slack.Client
 	channelRepo *channelRepo
 }
 
 // process returns response body and error.
-func (p *eventProcessor) process(ctx context.Context, msg *slackMessage) (string, error) {
-	// Challenge request
-	// https://api.slack.com/apis/connections/events-api
-	if msg.isChallenge() {
-		return fmt.Sprintf(`{"challenge":"%s"}`, msg.Challenge), nil
+func (p *eventProcessor) process(ctx context.Context, ev slackevents.EventsAPIEvent) error {
+	if ev.Type != slackevents.CallbackEvent {
+		return nil
 	}
 
-	if err := p.processExpenditure(ctx, msg.Event); err != nil {
-		return "", wrap(http.StatusInternalServerError, "p.processExpenditure: %w", err)
+	switch ev := ev.InnerEvent.Data.(type) {
+	case *slackevents.MessageEvent:
+		if err := p.processExpenditure(ctx, ev); err != nil {
+			return wrap(http.StatusInternalServerError, "p.processExpenditure: %w", err)
+		}
 	}
 
-	return "", nil
+	return nil
 }
 
-func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackEvent) error {
+func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackevents.MessageEvent) error {
 	ch, err := p.channelRepo.findByID(ctx, ev.Channel)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
@@ -79,18 +53,18 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackEvent)
 		return fmt.Errorf("p.channelRepo.findByID: %w", err)
 	}
 
-	ex, ok := ev.expenditure()
+	ex, ok := newExpenditure(ev)
 	if !ok {
 		// Messages not to be processed
 		return nil
 	}
 
-	ts, err := ev.timestamp()
+	t, err := ts2time(ex.ts)
 	if err != nil {
 		return fmt.Errorf("ev.timestamp: %w", err)
 	}
 
-	if err := p.store.add(ctx, ev.Channel, ts, ex); err != nil {
+	if err := p.store.add(ctx, ev.Channel, t, ex); err != nil {
 		err := fmt.Errorf("p.store.add: %w", err)
 
 		if err := p.replyError(ctx, ev.Channel, err); err != nil {
@@ -100,7 +74,7 @@ func (p *eventProcessor) processExpenditure(ctx context.Context, ev *slackEvent)
 		return err
 	}
 
-	total, err := p.store.total(ctx, ev.Channel, ts)
+	total, err := p.store.total(ctx, ev.Channel, t)
 	if err != nil {
 		err := fmt.Errorf("p.store.total: %w", err)
 

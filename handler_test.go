@@ -14,15 +14,15 @@ func Test_handler_challenge(t *testing.T) {
 	t.Parallel()
 
 	ep := &eventProcessor{
-		cfg:   &config{},
 		store: nil,
 		slack: newSlackMock(),
 	}
 	h := &handler{ep, nil}
 
-	body := bytes.NewBufferString(`{"challenge":"challengetoken"}`)
+	body := bytes.NewBufferString(`{"challenge":"challengetoken","type":"url_verification"}`)
 	req := httptest.NewRequest(http.MethodPost, "/", body)
 	req.Header.Add("Content-Type", "application/json")
+
 	rec := httptest.NewRecorder()
 
 	h.handleEvents(rec, req)
@@ -32,12 +32,12 @@ func Test_handler_challenge(t *testing.T) {
 	}
 
 	contentType := rec.Header().Get("Content-Type")
-	if contentType != "application/json" {
-		t.Errorf("Content-Type header should be 'application/json', but %s", contentType)
+	if contentType != "text/plain" {
+		t.Errorf("Content-Type header should be 'text/plain', but '%s'", contentType)
 	}
 
-	if respBody := rec.Body.String(); respBody != `{"challenge":"challengetoken"}` {
-		t.Errorf(`response should be '{"challenge":"challengetoken"}', but %s`, respBody)
+	if respBody := rec.Body.String(); respBody != `challengetoken` {
+		t.Errorf(`response should be 'challengetoken', but '%s'`, respBody)
 	}
 }
 
@@ -89,10 +89,6 @@ func Test_event_handler(t *testing.T) {
 
 			fs := getFirestoreClient(t)
 			ep := &eventProcessor{
-				cfg: &config{
-					Limits:        map[string]int64{"ch1": 1000},
-					SlackBotToken: "bottoken",
-				},
 				store:       &storeClient{fs},
 				slack:       mock,
 				channelRepo: &channelRepo{fs},

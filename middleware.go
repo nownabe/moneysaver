@@ -44,7 +44,7 @@ func slackVerifier(signingSecret string) func(next http.Handler) http.Handler {
 			}
 
 			if err := verifier.Ensure(); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
+				w.WriteHeader(http.StatusUnauthorized)
 
 				return
 			}

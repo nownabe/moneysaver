@@ -35,7 +35,6 @@ func main() {
 	}
 
 	ep := &eventProcessor{
-		cfg:         c,
 		store:       &storeClient{fs},
 		slack:       slack.New(c.SlackBotToken),
 		channelRepo: &channelRepo{fs},
