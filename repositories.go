@@ -93,3 +93,12 @@ func (r *expenditureRepo) total(ctx context.Context, ex *expenditure) (int64, er
 
 	return total, nil
 }
+
+func (r *expenditureRepo) delete(ctx context.Context, ex *expenditure) error {
+	docRef := r.collection(ex).Doc(ex.TS)
+	if _, err := docRef.Delete(ctx, firestore.Exists); err != nil {
+		return fmt.Errorf("docRef.Delete: %w", err)
+	}
+
+	return nil
+}

@@ -42,3 +42,14 @@ func newExpenditure(ev *slackevents.MessageEvent) (*expenditure, error) {
 		Timestamp: time.Unix(int64(ut), 0),
 	}, nil
 }
+
+func newExpenditureFromPreviousMessage(ev *slackevents.MessageEvent) (*expenditure, error) {
+	ex, err := newExpenditure(ev.PreviousMessage)
+	if err != nil {
+		return nil, fmt.Errorf("newExpenditure: %w", err)
+	}
+
+	ex.Channel = ev.Channel
+
+	return ex, nil
+}
