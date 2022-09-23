@@ -54,6 +54,7 @@ type expenditureRepo struct {
 
 func (r *expenditureRepo) collection(ex *expenditure) *firestore.CollectionRef {
 	month := ex.Timestamp.Format("2006-01")
+
 	return r.Collection(collectionName).Doc(ex.Channel).Collection(month)
 }
 
@@ -68,20 +69,25 @@ func (r *expenditureRepo) add(ctx context.Context, ex *expenditure) error {
 
 func (r *expenditureRepo) total(ctx context.Context, ex *expenditure) (int64, error) {
 	var e *expenditure
+
 	var total int64
 
 	docsIter := r.collection(ex).Documents(ctx)
+
 	for {
 		doc, err := docsIter.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
+
 		if err != nil {
 			return -1, fmt.Errorf("docsIter.Next: %w", err)
 		}
+
 		if err := doc.DataTo(&e); err != nil {
 			return -1, fmt.Errorf("doc.DataTo: %w", err)
 		}
+
 		total += e.Amount
 	}
 
