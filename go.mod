@@ -1,12 +1,12 @@
 module github.com/nownabe/moneysaver
 
-go 1.18
+go 1.25
 
 require (
 	cloud.google.com/go/firestore v1.6.1
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/slack-go/slack v0.12.2
+	github.com/slack-go/slack v0.23.1
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
 	google.golang.org/api v0.85.0
 	google.golang.org/grpc v1.47.0
@@ -20,7 +20,7 @@ require (
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.1.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.4.0 // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/net v0.0.0-20220617184016-355a448f1bc9 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
